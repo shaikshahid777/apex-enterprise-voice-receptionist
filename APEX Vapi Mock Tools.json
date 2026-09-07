@@ -1,0 +1,87 @@
+{
+  "name": "APEX Vapi Mock Tools",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "apex-receptionist-tools",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "38a178b9-ab54-4685-9aac-33f0b48f527f",
+      "name": "Vapi Tool Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "b9b4b892-4810-42c2-a079-5b96604bed2e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Supports BOTH Vapi tool shapes:\n// 1) Classic function tool: body.message.toolCalls[] -> respond { results: [{ toolCallId, result }] }\n// 2) API Request tool: flat body with { tool, ...params } -> respond flat mock JSON\nconst body = $input.first().json.body || {};\nconst message = body.message || {};\nconst toolCalls = message.toolCalls || [];\n\n// Mock payloads keyed by tool name\nfunction mockFor(name, args) {\n  switch (name) {\n    case 'route_call':\n      return {\n        status: 'Transferring',\n        sip_uri: 'sip:' + String((args && args.department) || 'sales').toLowerCase() + '@voice.apex.com',\n        extension: 'x4081',\n      };\n    case 'check_job_openings':\n      return {\n        openings: [\n          'Software Engineer - Austin',\n          'HR Manager - Remote',\n        ],\n      };\n    case 'check_invoice_status':\n      return {\n        status: 'Paid',\n        amount: '$4500.00',\n        due_date: '2026-07-20',\n      };\n    case 'capture_sales_lead':\n      return {\n        status: 'Lead Logged',\n        deal_id: 'DEAL-8821',\n      };\n    case 'send_confirmation':\n      return {\n        status: 'sent',\n        channel: 'email',\n      };\n    default:\n      return { error: 'Unknown tool: ' + name };\n  }\n}\n\nif (toolCalls.length > 0) {\n  // Classic function tool shape\n  const results = toolCalls.map((tc) => {\n    const fn = (tc && tc.function) || {};\n    let args = fn.arguments;\n    if (typeof args === 'string') {\n      try { args = JSON.parse(args); } catch (e) { args = {}; }\n    }\n    return {\n      toolCallId: tc.id,\n      result: JSON.stringify(mockFor(fn.name, args || {})),\n    };\n  });\n  return [{ json: { results } }];\n}\n\n// API Request tool shape: the tool name comes from a static body field 'tool'\nconst toolName = body.tool || body.name || 'unknown';\nreturn [{ json: mockFor(toolName, body) }];"
+      },
+      "id": "e2a21c02-1d34-4786-a309-67a6527b17c4",
+      "name": "Build Mock Tool Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "d0ada05e-c657-4f22-8f0f-bf90bc10bcd8",
+      "name": "Respond to Vapi",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Vapi Tool Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Mock Tool Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Mock Tool Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "15f50214-d623-4f07-b092-32d9770e0d87",
+  "meta": {
+    "instanceId": "201381d913fa9e78389f7093cb99cedc70c766251a500f897db19feccfda3bd0"
+  },
+  "nodeGroups": [],
+  "id": "jKP4EW2TRWWoXdHO",
+  "tags": []
+}
